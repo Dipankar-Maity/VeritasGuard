@@ -91,7 +91,7 @@ def get_genai_client(api_key: Optional[str] = None) -> genai.Client:
         )
 
     # Configure client with reasonable request timeout (30s)
-    http_options = types.HttpOptions(timeout=30000)
+    http_options = types.HttpOptions(timeout=120000)
     return genai.Client(api_key=key.strip(), http_options=http_options)
 
 
