@@ -23,6 +23,8 @@ from analyzer import (
     QuotaExceededError,
     ServiceUnavailableError,
     SYSTEM_PROMPT,
+    _resolve_language,
+    FEW_SHOT_EXAMPLES,
     get_configured_model,
     get_genai_client,
 )
@@ -102,6 +104,7 @@ def _validate_gemini_result(response: object, language: str) -> FraudAnalysisRes
         logger.warning("Gemini screenshot response failed schema validation")
         raise FraudAnalysisError("Gemini returned an invalid structured result. No assessment was shown.") from exc
     result.explanation_language = language
+    result.model_provider = "Gemini (image)"
     return result
 
 
@@ -110,6 +113,7 @@ def analyze_screenshot(
     language: str = "English",
     model_name: Optional[str] = None,
     client: Optional[genai.Client] = None,
+    strategy: str = "zero-shot",
 ) -> FraudAnalysisResult:
     """Analyze one sanitized screenshot via one Gemini multimodal request.
 
@@ -117,7 +121,9 @@ def analyze_screenshot(
     switch models, avoiding unexpected free-tier API consumption.
     """
     prepared = prepare_screenshot(image_bytes)
-    target_language = "Hindi" if "hindi" in language.lower() or "हिन्दी" in language else "English"
+    target_language = _resolve_language(language)
+    if strategy not in ("zero-shot", "few-shot"):
+        raise InvalidInputError("Choose zero-shot or few-shot prompting.")
     selected_model = (model_name or get_configured_model()).strip()
     if not selected_model:
         raise ConfigurationError("Please configure a valid GEMINI_MODEL.")
@@ -134,11 +140,17 @@ def analyze_screenshot(
         "Only describe cues actually visible. If text is unreadable or context is "
         "insufficient, return risk_level 'Uncertain', explain why, and recommend "
         "independent verification. Never guarantee safety. "
-        f"Write plain_language_explanation and protective_actions in {target_language}. "
+        "For visible payment QR codes, assess surrounding text; do not claim to decode "
+        "their hidden payment destination or assume they are malicious. "
+        "Separate observed_evidence and unverified_assumptions. "
+        f"Write all explanatory fields and protective actions in {target_language}. "
+        "Hindi uses Devanagari, Hinglish uses Romanized Hindi-English. "
         "Respond only with JSON matching the provided schema."
     )
+    if strategy == "few-shot":
+        prompt += " Synthetic reference patterns (not evidence about this image): " + FEW_SHOT_EXAMPLES
     config = types.GenerateContentConfig(
-        system_instruction=SYSTEM_PROMPT.format(target_language=target_language),
+        system_instruction=SYSTEM_PROMPT.replace("{target_language}", target_language),
         response_mime_type="application/json",
         response_schema=FraudAnalysisResult,
         temperature=0.1,

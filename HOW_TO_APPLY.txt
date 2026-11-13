@@ -1,0 +1,12 @@
+VeritasGuard targeted Gemini/Groq fix
+
+1. Stop Streamlit with Ctrl+C in its terminal.
+2. Back up or commit current changes first if you have made other edits.
+3. Extract these files into D:\Project\Open Elective Project\VeritasGuard\ and replace analyzer.py and tests\test_groq_provider.py.
+4. Do NOT modify .env. Keep GROQ_MODEL=openai/gpt-oss-120b.
+5. Run: .\.venv\Scripts\python.exe -m pytest -v -s
+6. Run: .\.venv\Scripts\python.exe -m streamlit run app.py
+7. Select Text Message, Groq, English, zero-shot for ONE controlled live test. Then check Hinglish/few-shot if working.
+8. If Gemini returns HTTP 503, the service is busy; HTTP 504 means timeout; HTTP 429 means quota/rate limit. Do not repeatedly retry.
+
+Changes: Groq now uses JSON Schema structured outputs instead of JSON Object Mode; the provided GPT-OSS model supports strict schema outputs. This enforces required response field names and shapes but does not guarantee fraud assessment accuracy. Gemini 503/504 messages are differentiated. No API keys included.

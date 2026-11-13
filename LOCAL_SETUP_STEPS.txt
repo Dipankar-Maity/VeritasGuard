@@ -1,28 +1,14 @@
-VERITASGUARD — MILESTONE 2 INSTALLATION (WINDOWS 11)
-==================================================
+VERITASGUARD — FINAL SYNOPSIS ALIGNMENT (WINDOWS)
+================================================
 
-1. Keep your existing local .env secret file. It is NOT included in this ZIP.
-2. Close the running Streamlit terminal (Ctrl+C) before replacing files.
-3. If using VeritasGuard_Milestone2_Update.zip, extract its contents DIRECTLY into:
-   D:\Project\Open Elective Project\VeritasGuard
-   Allow overwrite for existing app.py, requirements.txt and README.md.
-   It will add image_analyzer.py and tests\test_image_analyzer.py.
-4. In Antigravity open a fresh PowerShell terminal in that folder.
-5. Install/update the required packages (no AI coding agent needed):
-   .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-6. Run actual local automated tests:
-   .\.venv\Scripts\python.exe -m pytest -v -s
-7. Start VeritasGuard:
-   .\.venv\Scripts\python.exe -m streamlit run app.py
-8. Visit http://localhost:8501 and select:
-   Live AI Analysis -> Screenshot Image -> upload a synthetic/redacted PNG/JPEG
-   Review the preview without a Gemini call.
-9. If ready, click Analyze ONCE for one live image test.
+The previous Milestone 2 setup instructions are superseded by:
+WINDOWS_INTEGRATION.md and docs/TESTING_GUIDE.md.
 
-Project note: the separate offline execution environment here could not
-install the full google-genai/streamlit packages. We ran 30 unit tests
-(17 original + 13 new) successfully with temporary MOCK SDK classes.
-This is NOT a claim that live image analysis was already tested.
-The mocks are NOT included in your delivered files.
+Preserve your local .env, .venv and Git history. This ZIP contains NONE of them.
 
-API key security: do not share or commit .env. Keep its existing value.
+Run these commands in the VeritasGuard project directory:
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pytest -v -s
+.\.venv\Scripts\python.exe -m streamlit run app.py
+
+Do not claim the optional Groq feature was tested live without configuring it.

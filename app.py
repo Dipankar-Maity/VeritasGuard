@@ -1,7 +1,7 @@
 """
 VeritasGuard — AI-Powered Cyber Fraud Detection
 Course: NVIDIA AI & Deep Learning Open Elective, Dayananda Sagar University
-Milestone 1 — Streamlit Dashboard
+Milestone 3 — Multilingual Multimodal Streamlit Dashboard
 """
 
 import os
@@ -16,6 +16,7 @@ from schema import FraudAnalysisResult, RiskLevel
 from image_analyzer import analyze_screenshot, prepare_screenshot
 from analyzer import (
     analyze_message,
+    analyze_text_with_provider,
     get_offline_demo_samples,
     get_configured_model,
     FraudAnalysisError,
@@ -107,7 +108,7 @@ def render_sidebar():
         st.markdown("#### 🎓 Academic Project")
         st.markdown("**Course:** NVIDIA AI & Deep Learning Open Elective")
         st.markdown("**Institution:** Dayananda Sagar University")
-        st.markdown("**Milestone:** 2 (Text + Screenshot Multimodal GenAI)")
+        st.markdown("**Milestone:** 3 (Vernacular + Multimodal GenAI)")
         st.markdown("---")
 
         # Configuration status
@@ -120,7 +121,8 @@ def render_sidebar():
         else:
             st.error("🔴 **API Key:** Missing (`GEMINI_API_KEY`)")
 
-        st.info(f"🤖 **Configured Model:** `{configured_model}`")
+        st.info(f"🤖 **Configured Gemini Model:** `{configured_model}`")
+        st.caption("Optional Groq text provider: " + ("Configured" if os.getenv("GROQ_API_KEY") else "Not configured"))
 
         st.markdown("---")
 
@@ -154,6 +156,8 @@ def render_analysis_results(result: FraudAnalysisResult, is_demo: bool = False):
             unsafe_allow_html=True,
         )
 
+    if result.model_provider and not is_demo:
+        st.caption(f"AI provider: {result.model_provider} · Pydantic v2 validated output (not independent verification)")
     # Top Metric Banner
     risk_color = result.get_badge_color()
     risk_icon = result.get_badge_icon()
@@ -228,6 +232,18 @@ def render_analysis_results(result: FraudAnalysisResult, is_demo: bool = False):
     else:
         st.markdown("1. Always verify message sender through independent official channels.")
 
+    # Grounding and uncertainty: these fields are optional for legacy models.
+    if result.observed_evidence:
+        st.markdown("#### 🔎 Evidence Observed in the Input")
+        for clue in result.observed_evidence:
+            st.markdown(f"- {clue}")
+    if result.unverified_assumptions:
+        st.markdown("#### ❔ Not Independently Verified")
+        for assumption in result.unverified_assumptions:
+            st.markdown(f"- {assumption}")
+    if result.uncertainty_explanation:
+        st.info(f"Uncertainty: {result.uncertainty_explanation}")
+
     # Safety disclaimer
     st.warning(f"⚠️ {result.safety_disclaimer}")
 
@@ -268,7 +284,7 @@ def main():
     # =========================================================================
     with tab_live:
         st.markdown("### Analyze a Suspicious Message or Screenshot")
-        st.caption("Real Gemini multimodal analysis. Choose text or upload a screenshot; neither input is used for a background scan.")
+        st.caption("User-initiated AI analysis: Gemini handles text and screenshots; optional Groq handles text only. No automatic background scanning.")
 
         analysis_mode = st.radio(
             "Input type", ["📝 Text Message", "🖼️ Screenshot Image"],
@@ -277,16 +293,39 @@ def main():
         col_input, col_settings = st.columns([3, 1])
         with col_settings:
             language_option = st.selectbox(
-                "Explanation Language / भाषा", ["English", "हिन्दी (Hindi)"],
+                "Explanation Language / भाषा", ["English", "हिन्दी (Hindi)", "Hinglish (Roman Hindi-English)"],
                 help="Choose the language for the explanation and protective advice.",
             )
-            model_override = st.text_input(
-                "Gemini Model Override", value=get_configured_model(),
-                help="Use a Gemini model that accepts image inputs when analyzing screenshots.",
+            prompt_strategy = st.selectbox(
+                "Prompting Strategy", ["zero-shot", "few-shot"],
+                help="Few-shot adds small synthetic examples; zero-shot uses criteria only.",
             )
+            if analysis_mode == "📝 Text Message":
+                text_provider = st.selectbox(
+                    "Text AI Provider", ["Gemini", "Groq"],
+                    help="Groq is optional and requires a separate GROQ_API_KEY in your local .env.",
+                )
+                use_groq_fallback = st.checkbox(
+                    "Allow Groq fallback if Gemini fails (text only)", value=False,
+                    disabled=(text_provider != "Gemini" or not bool(os.getenv("GROQ_API_KEY"))),
+                    help="Opt-in only: sends the submitted text to Groq if Gemini is unavailable or rate-limited.",
+                )
+            else:
+                text_provider = "Gemini"
+                use_groq_fallback = False
+                st.caption("Screenshots use Gemini Vision only; they are never sent to Groq.")
+            if text_provider == "Gemini":
+                model_override = st.text_input(
+                    "Gemini Model Override", value=get_configured_model(),
+                    help="Choose a Gemini model available to your API key; image input requires vision support.",
+                )
+            else:
+                model_override = None
+                st.caption("Groq text model is controlled by GROQ_MODEL in your .env.")
 
         with col_input:
             if analysis_mode == "📝 Text Message":
+                st.caption("Privacy: avoid submitting real OTPs, banking credentials or unnecessary personal information. Text is sent to the selected provider only when Analyze is pressed.")
                 user_message = st.text_area(
                     "Suspicious Message Text (Untrusted Input)",
                     placeholder="Example: Your bank account will be suspended unless you share your OTP...",
@@ -300,7 +339,8 @@ def main():
                 st.warning(
                     "Privacy: crop or redact names, phone numbers, bank details, "
                     "OTPs and other sensitive information before uploading. "
-                    "The sanitized screenshot is sent to the configured Gemini API only when you press Analyze."
+                    "Metadata is stripped but names/OTPs are NOT automatically redacted. "
+                    "Your image is sent to Gemini only when you press Analyze."
                 )
                 uploaded_image = st.file_uploader(
                     "Upload a WhatsApp, SMS or email screenshot",
@@ -311,7 +351,7 @@ def main():
                 if uploaded_image is not None:
                     try:
                         preview = prepare_screenshot(uploaded_image.getvalue())
-                        st.image(preview.data, caption="Sanitized screenshot preview", use_container_width=True)
+                        st.image(preview.data, caption="Metadata-stripped preview (visible content is NOT redacted)", use_container_width=True)
                         st.caption(f"Prepared for Gemini: {preview.width} × {preview.height} pixels; metadata removed.")
                     except InvalidInputError as e:
                         st.error(f"Invalid image: {e}")
@@ -321,12 +361,14 @@ def main():
                 if analysis_mode == "📝 Text Message":
                     if not user_message.strip():
                         raise InvalidInputError("Please paste or type a suspicious message.")
-                    with st.spinner("Analyzing message with Gemini..."):
-                        result = analyze_message(
+                    with st.spinner(f"Analyzing message with {text_provider}..."):
+                        result = analyze_text_with_provider(
                             message_text=user_message,
                             language=language_option,
+                            strategy=prompt_strategy,
+                            provider=text_provider,
+                            fallback_to_groq=use_groq_fallback,
                             model_name=model_override,
-                            allow_fallback=False,  # one API call per click; conserve quota
                         )
                 else:
                     if uploaded_image is None:
@@ -339,8 +381,9 @@ def main():
                             image_bytes=image_bytes,
                             language=language_option,
                             model_name=model_override,
+                            strategy=prompt_strategy,
                         )
-                st.success("✅ Analysis returned from Gemini and validated with Pydantic.")
+                st.success(f"✅ Analysis returned from {result.model_provider or 'the selected AI'} and validated with Pydantic.")
                 render_analysis_results(result, is_demo=False)
             except InvalidInputError as e:
                 st.warning(f"⚠️ {e}")
@@ -348,7 +391,7 @@ def main():
                 st.error(f"⚙️ {e}")
             except QuotaExceededError as e:
                 st.error(f"⏳ {e}")
-                st.info("The Offline Demo works without an API request.")
+                st.info("The Offline Demo works without an API request. Optional Groq text analysis requires its own key.")
             except ServiceUnavailableError as e:
                 st.error(f"🚧 {e}")
             except NetworkError as e:
@@ -398,7 +441,7 @@ def main():
             
             Traditional spam filters rely heavily on static keyword matching or blocklists, which are easily evaded by 
             cybercriminals using obfuscated text, homoglyphs, and dynamic links. VeritasGuard leverages 
-            Large Language Models (Google Gemini) to perform semantic understanding of deception, 
+            Large Language Models (Google Gemini and optional Groq) to perform semantic understanding of deception, 
             coercive psychology, and social engineering patterns.
             """
         )

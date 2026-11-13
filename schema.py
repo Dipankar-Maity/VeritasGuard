@@ -39,7 +39,7 @@ class FraudAnalysisResult(BaseModel):
     )
     plain_language_explanation: str = Field(
         ...,
-        description="Clear, easy-to-understand explanation of the message and its risk indicators, in the requested language (English or Hindi)."
+        description="Plain-language assessment in English, Hindi or Hinglish. Distinguish observations and inferences."
     )
     protective_actions: List[str] = Field(
         default_factory=list,
@@ -51,11 +51,27 @@ class FraudAnalysisResult(BaseModel):
     )
     explanation_language: str = Field(
         default="English",
-        description="Language of the explanation: English or Hindi."
+        description="Language of the explanation: English, Hindi or Hinglish."
     )
     safety_disclaimer: str = Field(
         default="Automated AI Advisory: VeritasGuard analysis cannot guarantee 100% safety. Always exercise independent caution with unverified messages.",
         description="Mandatory disclaimer stating that no message can be guaranteed 100% safe."
+    )
+    observed_evidence: Optional[List[str]] = Field(
+        default=None,
+        description="Specific evidence observed in the message that supports the risk assessment."
+    )
+    unverified_assumptions: Optional[List[str]] = Field(
+        default=None,
+        description="Assumptions made during analysis that could not be independently verified."
+    )
+    uncertainty_explanation: Optional[str] = Field(
+        default=None,
+        description="Explanation of any uncertainty or ambiguity in the analysis result."
+    )
+    model_provider: Optional[str] = Field(
+        default=None,
+        description="Identifier for the AI model provider used (e.g., 'gemini', 'groq', 'gemini-langchain')."
     )
 
     def get_badge_color(self) -> str:
